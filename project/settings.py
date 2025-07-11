@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-4kjpdeec9i-er9y2122by@!x0@(_x8*5yvzw^x#ewtca404_ne
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['5.129.227.190']
+# ALLOWED_HOSTS = ['5.129.227.190',"*"]
 
 
 # Application definition
@@ -126,7 +126,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
+# Добавьте в конец файла:
+LOGIN_URL = '/login/'  # URL для перенаправления на страницу входа
+LOGIN_REDIRECT_URL = '/'  # Куда перенаправлять после успешного входа
+LOGOUT_REDIRECT_URL = '/login/'  # Куда перенаправлять после выхода
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 

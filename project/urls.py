@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from django.conf import settings 
 from django.conf.urls.static import static
-from core.views import CashOperationsListView, ReportsView, add_client, client_detail, client_list, export_reports, freeze_membership, membership_type_info, refund_membership, sell_card, unfreeze_membership, withdraw_cash
+from core.views import CashOperationsListView, ReportsView, add_client, client_detail, client_list, export_reports, freeze_membership, login_view, logout_view, membership_type_info, protected_view, refund_membership, sell_card, unfreeze_membership, withdraw_cash
 urlpatterns = [
     path('', client_list, name='client_list'),
     path('admin/', admin.site.urls),
@@ -33,6 +33,11 @@ urlpatterns = [
     path('cash-operations/', CashOperationsListView.as_view(), name='cash_operations'),
     path('sell-card/', sell_card, name='sell_card'),
     path('withdraw-cash/', withdraw_cash, name='withdraw_cash'),
+    path('login/', login_view, name='login'),
+    path('logout/', logout_view, name='logout'),
+    
+    # Пример защищенного маршрута
+    path('protected/', protected_view, name='protected'),
 ]
 
 
