@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Отчеты</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-filter"></i> Фильтр отчетов
+        </div>
+        <div class="card-body">
+            <form method="get" action="{% url 'export_reports' %}" id="reportForm">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Дата начала</label>
+                            <input type="date" name="start_date" class="form-control" 
+                                   value="{{ start_date }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Дата окончания</label>
+                            <input type="date" name="end_date" class="form-control" 
+                                   value="{{ end_date }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-file-excel"></i> Экспорт в Excel
+                        </button>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="mt-3">
+                <button class="btn btn-outline-secondary me-2" onclick="setDateRange(7)">
+                    За неделю
+                </button>
+                <button class="btn btn-outline-secondary me-2" onclick="setDateRange(30)">
+                    За месяц
+                </button>
+                <button class="btn btn-outline-secondary" onclick="setDateRange(90)">
+                    За квартал
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <i class="bi bi-info-circle"></i> Инструкция
+        </div>
+        <div class="card-body">
+            <p>Для получения отчета:</p>
+            <ol>
+                <li>Укажите период с помощью фильтра дат</li>
+                <li>Нажмите "Экспорт в Excel"</li>
+                <li>Отчет будет содержать два листа:
+                    <ul>
+                        <li>Продажи абонементов</li>
+                        <li>Платежи</li>
+                    </ul>
+                </li>
+            </ol>
+            <p>Используйте кнопки "За неделю/месяц/квартал" для быстрого выбора периода.</p>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function setDateRange(days) {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days);
+    
+    document.querySelector('input[name="start_date"]').value = formatDate(startDate);
+    document.querySelector('input[name="end_date"]').value = formatDate(endDate);
+}
+
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Устанавливаем диапазон за последние 30 дней при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    setDateRange(30);
+});
+</script>
+{% endblock %}
+{% endblock %}

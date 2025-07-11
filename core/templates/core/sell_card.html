@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Форма продажи карты -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-credit-card"></i> Продажа карты доступа
+                </div>
+                <div class="card-body">
+                    <form method="post" name='sell_card'>
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.card_number.label }}</label>
+                            {{ form.card_number }}
+                            <small class="text-muted">Уникальный номер карты</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.price.label }}</label>
+                            {{ form.price }}
+                            <small class="text-muted">Цена продажи</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.client.label }}</label>
+                            {{ form.client }}
+                            <small class="text-muted">Оставьте пустым, если карта продается без привязки</small>
+                        </div>
+                        <button type="submit" name="sell_card" class="btn btn-primary w-100">
+                            <i class="bi bi-save"></i> Оформить продажу
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Форма изъятия денег из кассы -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <i class="bi bi-cash-coin"></i> Изъятие денег из кассы
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'withdraw_cash' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">{{ withdraw_form.amount.label }}</label>
+                            {{ withdraw_form.amount }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ withdraw_form.reason.label }}</label>
+                            {{ withdraw_form.reason }}
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="bi bi-trash"></i> Изъять из кассы
+                        </button>
+                    </form>
+
+                    <!-- Текущий баланс кассы -->
+                    <div class="alert alert-info mt-4">
+                        <div class="d-flex justify-content-between">
+                            <strong>Текущий баланс:</strong>
+                            <span>{{ cash_register.balance }} сом</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- История последних операций -->
+    <div class="card mt-4">
+        <div class="card-header bg-secondary text-white">
+            <i class="bi bi-clock-history"></i> Последние операции
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Тип</th>
+                            <th>Сумма</th>
+                            <th>Описание</th>
+                            <th>Кассир</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for operation in last_operations %}
+                        <tr>
+                            <td>{{ operation.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                <span class="badge bg-{% if operation.operation_type == 'income' %}success{% else %}danger{% endif %}">
+                                    {{ operation.get_operation_type_display }}
+                                </span>
+                            </td>
+                            <td>{{ operation.amount }} сом</td>
+                            <td>{{ operation.notes|truncatechars:30 }}</td>
+                            <td>{{ operation.created_by.get_full_name }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">Нет операций</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <a href="{% url 'cash_operations' %}" class="btn btn-outline-primary mt-3">
+                <i class="bi bi-list-ul"></i> Полная история операций
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

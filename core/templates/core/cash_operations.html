@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Операции по кассе</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between">
+            <span>Баланс: {{ cash_register.balance }} сом</span>
+            <span>Всего операций: {{ operations.count }}</span>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Тип</th>
+                    <th>Сумма</th>
+                    <th>Описание</th>
+                    <th>Способ оплаты</th>
+                    <th>Кассир</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for operation in operations %}
+                <tr>
+                    <td>{{ operation.created_at|date:"d.m.Y H:i" }}</td>
+                    <td>
+                        <span class="badge bg-{% if operation.operation_type == 'income' %}success{% else %}danger{% endif %}">
+                            {{ operation.get_operation_type_display }}
+                        </span>
+                    </td>
+                    <td>{{ operation.amount }} сом</td>
+                    <td>
+                        
+                        {% comment %} {% if operation.payment %}
+                            {{ operation.payment.notes }}
+                        {% elif operation.card_sale %}
+                            Продажа карты #{{ operation.card_sale.card_number }}
+                        {% else %} {% endcomment %}
+                            {{ operation.notes }}
+                        {% comment %} {% endif %} {% endcomment %}
+                    </td>
+                    <td>
+                        {% if operation.payment %}
+                            {{ operation.payment.get_payment_method_display }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ operation.created_by }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% comment %}     
+    {% include 'includes/pagination.html' %} {% endcomment %}
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ title }}</h1>
+    
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        Основная информация
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.full_name.label }}</label>
+                            {{ form.full_name }}
+                            <div class="text-danger">{{ form.full_name.errors }}</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.phone.label }}</label>
+                            {{ form.phone }}
+                            <div class="text-danger">{{ form.phone.errors }}</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.email.label }}</label>
+                            {{ form.email }}
+                            <div class="text-danger">{{ form.email.errors }}</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.card_id.label }}</label>
+                            {{ form.card_id }}
+                            <div class="text-danger">{{ form.card_id.errors }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        Дополнительная информация
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.gender.label }}</label>
+                            {{ form.gender }}
+                            <div class="text-danger">{{ form.gender.errors }}</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.birth_date.label }}</label>
+                            {{ form.birth_date }}
+                            <div class="text-danger">{{ form.birth_date.errors }}</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.photo.label }}</label>
+                            {{ form.photo }}
+                            <div class="text-danger">{{ form.photo.errors }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                Примечания
+            </div>
+            <div class="card-body">
+                {{ form.notes }}
+                <div class="text-danger">{{ form.notes.errors }}</div>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'client_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Назад к списку
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-save"></i> Сохранить клиента
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
