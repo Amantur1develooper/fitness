@@ -926,7 +926,23 @@ def export_reports(request):
              m.created_by.username if m.created_by else 'Система'
             # m.client.created_by.get_full_name() if m.client.created_by else ''
         ])
-    
+    payment_aboniment = Payment.objects.filter(notes__icontains = "Одноразовый абонемент").filter(
+        payment_date__date__gte=start_date,
+        payment_date__date__lte=end_date
+    )
+
+    for m in payment_aboniment:
+        ws_sales.append([
+            m.payment_date.strftime('%d.%m.%Y %H:%M'),
+            m.notes,
+            m.get_payment_method_display(),
+            m.amount,
+            m.discount_amount,
+            m.amount,
+            0,
+             m.created_by.username if m.created_by else 'Система'
+            # m.client.created_by.get_full_name() if m.client.created_by else ''
+        ])
     # Лист с платежами
     ws_payments = wb.create_sheet("Платежи")
     ws_payments.append([
@@ -1066,7 +1082,7 @@ def export_sales_report(request):
 #     response['Content-Disposition'] = 'attachment; filename=report.xlsx'
 #     wb.save(response)
 #     return response
-
+from datetime import datetime
 @login_required
 @transaction.atomic
 def withdraw_cash(request):
@@ -1095,3 +1111,68 @@ def withdraw_cash(request):
             return redirect('sell_card')
     
     return redirect('sell_card')
+
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.utils import timezone
+from .forms import OneTimeMembershipForm
+from .models import Client, Payment, CashRegister, CashOperation
+
+@login_required
+def sell_one_time_membership(request):
+    if request.method == 'POST':
+        form = OneTimeMembershipForm(request.POST)
+        if form.is_valid():
+            # Рассчитываем цену в зависимости от времени
+            price = form.calculate_price()
+#             client = Client.objects.filter(phone=form.cleaned_data['phone']).first()
+# if client:
+#     # Обновляем данные существующего клиента
+# else:
+#     # Создаем нового
+            # Создаем или находим клиента
+            client, created = Client.objects.get_or_create(
+                phone=form.cleaned_data['phone'],
+                defaults={
+                    'full_name': form.cleaned_data['client_full_name'],
+                    'created_by': request.user
+                },
+                notes = f"Купил одноразовый абонимент в {datetime.now()}"
+            )
+            
+            if not created:
+                client.full_name = form.cleaned_data['client_full_name']
+                client.save()
+            
+            # Создаем платеж
+            payment = Payment.objects.create(
+                amount=price,
+                payment_method=form.cleaned_data['payment_method'],
+                notes=f"Одноразовый абонемент ({'до 14:00' if price == 200 else 'после 14:00'})имя:{form.cleaned_data['client_full_name']} {form.cleaned_data['notes']}",
+                created_by=request.user
+            )
+            
+            # Записываем операцию в кассу
+            cash_register = CashRegister.objects.first()  # Или ваша логика выбора кассы
+            if cash_register:
+                CashOperation.objects.create(
+                    cash_register=cash_register,
+                    operation_type='income',
+                    amount=price,
+                    payment=payment,
+                    notes=f"Оплата одноразового абонемента",
+                    created_by=request.user
+                )
+            
+            messages.success(request, f'Одноразовый абонемент продан за {price} сом')
+            return redirect('client_list')
+    else:
+        form = OneTimeMembershipForm()
+    
+    return render(request, 'sell_one_time_membership.html', {
+        'form': form,
+        'current_price': form.calculate_price()
+    })
+    

@@ -13,10 +13,18 @@ class ClientForm(forms.ModelForm):
         }
     
     def clean_card_id(self):
-        card_id = self.cleaned_data['card_id']
+        card_id = self.cleaned_data.get('card_id')
+        if not card_id:
+            raise ValidationError('Номер карты обязателен')
         if Client.objects.filter(card_id=card_id).exists():
             raise ValidationError('Клиент с таким номером карты уже существует')
         return card_id
+
+    # def clean_card_id(self):
+    #     card_id = self.cleaned_data['card_id']
+    #     if Client.objects.filter(card_id=card_id).exists():
+    #         raise ValidationError('Клиент с таким номером карты уже существует')
+    #     return card_id
 # core/forms.py
 # class MembershipForm(forms.ModelForm):
 #     discount_amount = forms.DecimalField(
@@ -221,3 +229,35 @@ class WithdrawForm(forms.Form):
 #         super().__init__(*args, **kwargs)
 #         self.fields['client'].queryset = Client.objects.filter(is_active=True)
 #         self.fields['client'].required = False
+
+from django import forms
+from django.utils import timezone
+from .models import Client, Payment, CashRegister, CashOperation
+
+class OneTimeMembershipForm(forms.Form):
+    client_full_name = forms.CharField(
+        label='ФИО клиента',
+        max_length=100,
+        widget=forms.TextInput(attrs={'class': 'form-control'}))
+    
+    phone = forms.CharField(
+        label='Телефон',
+        max_length=20,
+        widget=forms.TextInput(attrs={'class': 'form-control'}))
+    
+    payment_method = forms.ChoiceField(
+        label='Способ оплаты',
+        choices=Payment.PAYMENT_METHODS,
+        widget=forms.Select(attrs={'class': 'form-control'}))
+    
+    notes = forms.CharField(
+        label='Примечание',
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
+    
+    def calculate_price(self):
+        now = timezone.localtime(timezone.now())
+        if now.hour < 14:  # До 14:00
+            return 200
+        return 400
+        

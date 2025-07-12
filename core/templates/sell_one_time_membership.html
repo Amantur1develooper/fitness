@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Продажа одноразового абонемента</h2>
+<p>Текущая цена: <strong>{{ current_price }} сом</strong> ({% now "H:i" %})</p>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Оформить</button>
+</form>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const hours = now.getHours();
+    const priceElement = document.querySelector('.current-price');
+    
+    if (hours < 14) {
+        priceElement.textContent = '200 сом (до 14:00)';
+    } else {
+        priceElement.textContent = '400 сом (после 14:00)';
+    }
+});
+</script>
+{% endblock %}

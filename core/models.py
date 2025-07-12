@@ -19,10 +19,10 @@ class Client(models.Model):
     phone = models.CharField(max_length=20, verbose_name="Телефон")
     email = models.EmailField(blank=True, verbose_name="Email")
     birth_date = models.DateField(null=True, blank=True, verbose_name="Дата рождения")
-    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name="Пол")
+    gender = models.CharField(max_length=1,  null=True, blank=True, choices=GENDER_CHOICES, verbose_name="Пол")
     photo = models.ImageField(upload_to='client_photos/', null=True, blank=True, verbose_name="Фото")
     notes = models.TextField(blank=True, verbose_name="Примечания")
-    card_id = models.CharField(max_length=50, unique=True, verbose_name="ID карты доступа")
+    card_id = models.CharField(max_length=50, null=True, blank=True, unique=True, verbose_name="ID карты доступа")
     is_active = models.BooleanField(default=True, verbose_name="Активный клиент")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
     created_by = models.ForeignKey(User,blank=True, on_delete=models.SET_NULL, null=True, 
