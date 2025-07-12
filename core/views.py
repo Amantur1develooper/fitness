@@ -17,7 +17,7 @@ def login_view(request):
         
         if user is not None:
             login(request, user)
-            next_url = request.GET.get('next', 'home')  # Получаем параметр next или используем home
+            next_url = request.GET.get('next', 'client_list')  # Получаем параметр next или используем home
             return redirect(next_url)
         else:
             messages.error(request, 'Неверное имя пользователя или пароль')
@@ -100,7 +100,7 @@ def add_client(request):
         if form.is_valid():
             client = form.save()
             messages.success(request, f'Клиент {client.full_name} успешно добавлен!')
-            return redirect('client_list')
+            return redirect('client_detail', client.id)
     else:
         form = ClientForm()
     
@@ -1097,9 +1097,18 @@ def withdraw_cash(request):
             if amount > cash_register.balance:
                 messages.error(request, 'Недостаточно средств в кассе!')
                 return redirect('sell_card')
-            
+             # Создаем запись о платеже
+            payment1 = Payment.objects.create(
+              
+                amount=-amount,
+                payment_date = timezone.now(), #datetime.day()
+                is_debt_payment=True,
+                notes=f"Изьятие денег из кассы. Причина: {reason}",
+                created_by=request.user
+            )
             # Создаем операцию изъятия
             CashOperation.objects.create(
+                payment= payment1,
                 cash_register=cash_register,
                 operation_type='outcome',
                 amount=amount,
