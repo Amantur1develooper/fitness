@@ -234,30 +234,57 @@ from django import forms
 from django.utils import timezone
 from .models import Client, Payment, CashRegister, CashOperation
 
+# class OneTimeMembershipForm(forms.Form):
+#     client_full_name = forms.CharField(
+#         label='ФИО клиента',
+#         max_length=100,
+#         widget=forms.TextInput(attrs={'class': 'form-control'}))
+    
+#     phone = forms.CharField(
+#         label='Телефон',
+#         max_length=20,
+#         widget=forms.TextInput(attrs={'class': 'form-control'}))
+    
+#     payment_method = forms.ChoiceField(
+#         label='Способ оплаты',
+#         choices=Payment.PAYMENT_METHODS,
+#         widget=forms.Select(attrs={'class': 'form-control'}))
+    
+#     notes = forms.CharField(
+#         label='Примечание',
+#         required=False,
+#         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
+    
+#     def calculate_price(self):
+#         now = timezone.localtime(timezone.now())
+#         if now.hour < 14:  # До 14:00
+#             return 200
+#         return 400
+
 class OneTimeMembershipForm(forms.Form):
-    client_full_name = forms.CharField(
-        label='ФИО клиента',
-        max_length=100,
-        widget=forms.TextInput(attrs={'class': 'form-control'}))
-    
-    phone = forms.CharField(
-        label='Телефон',
-        max_length=20,
-        widget=forms.TextInput(attrs={'class': 'form-control'}))
-    
+    client_full_name = forms.CharField(label='ФИО клиента', max_length=100)
+    phone = forms.CharField(label='Телефон', max_length=20)
+    price = forms.DecimalField(
+        label='Цена абонемента', 
+        max_digits=10, 
+        decimal_places=2,
+        initial=200  # или другая базовая цена
+    )
+   
     payment_method = forms.ChoiceField(
         label='Способ оплаты',
-        choices=Payment.PAYMENT_METHODS,
-        widget=forms.Select(attrs={'class': 'form-control'}))
-    
+        choices=Payment.PAYMENT_METHODS
+    )
     notes = forms.CharField(
-        label='Примечание',
+        label='Примечания',
         required=False,
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
+        widget=forms.Textarea(attrs={'rows': 2}))
     
-    def calculate_price(self):
-        now = timezone.localtime(timezone.now())
-        if now.hour < 14:  # До 14:00
-            return 200
-        return 400
+    def clean_visit_price(self):
+        visit_price = self.cleaned_data.get('visit_price')
+        price = self.cleaned_data.get('price')
+        if not visit_price:
+            return price  # Если не указана, равна цене абонемента
+        return visit_price
+        
         

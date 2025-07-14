@@ -1135,7 +1135,7 @@ def sell_one_time_membership(request):
         form = OneTimeMembershipForm(request.POST)
         if form.is_valid():
             # Рассчитываем цену в зависимости от времени
-            price = form.calculate_price()
+            price = form.cleaned_data['price']
 #             client = Client.objects.filter(phone=form.cleaned_data['phone']).first()
 # if client:
 #     # Обновляем данные существующего клиента
@@ -1182,6 +1182,6 @@ def sell_one_time_membership(request):
     
     return render(request, 'sell_one_time_membership.html', {
         'form': form,
-        'current_price': form.calculate_price()
+        # 'current_price': form.calculate_price()
     })
     
