@@ -42,7 +42,11 @@
         <i class="bi bi-file-earmark-bar-graph"></i> Одноразовый абонимент
     </a>
     
-
+     {% if user.is_superuser %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/">Настройки</a>
+                    </li>
+                    {% endif %}
 
 
             </ul>

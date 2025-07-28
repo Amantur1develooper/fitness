@@ -201,7 +201,7 @@ class CardSaleForm(forms.ModelForm):
         if CardSale.objects.filter(card_number=card_number).exists():
             raise forms.ValidationError('Карта с таким номером уже продана')
         return card_number
-    
+from django.db.models import Q   
 class WithdrawForm(forms.Form):
     amount = forms.DecimalField(
         max_digits=10,
@@ -260,7 +260,123 @@ from .models import Client, Payment, CashRegister, CashOperation
 #         if now.hour < 14:  # До 14:00
 #             return 200
 #         return 400
+from django import forms
+from .models import Client
+from django.contrib.auth.models import User
 
+
+class ClientEditForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = [
+            'full_name',
+            'phone',
+            'email',
+            'birth_date',
+            'photo',
+            'notes',
+            'card_id',
+            'is_active',
+            'user'
+        ]
+        widgets = {
+            'birth_date': forms.DateInput(
+                attrs={
+                    'type': 'date',
+                    'class': 'form-control'
+                }
+            ),
+            'notes': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'form-control',
+                'placeholder': 'Дополнительная информация о клиенте'
+            }),
+            'full_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Иванов Иван Иванович'
+            }),
+            'phone': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+7 (999) 123-45-67'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'client@example.com'
+            }),
+            'card_id': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'RFID или номер карты'
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'user': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'photo': forms.FileInput(attrs={
+                'class': 'form-control'
+            })
+        }
+        labels = {
+            'is_active': 'Активный клиент',
+            'card_id': 'ID карты доступа',
+            'photo': 'Фотография профиля'
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        current_user = self.instance.user
+        self.fields['user'].queryset = User.objects.filter(
+            Q(client__isnull=True) | Q(pk=current_user.pk) if current_user else Q()
+        )
+        self.fields['user'].required = False
+        self.fields['user'].label = 'Привязать к учетной записи'
+        
+        # Добавляем классы Bootstrap для всех полей
+        for field_name, field in self.fields.items():
+            if 'class' not in field.widget.attrs:
+                if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
+                    field.widget.attrs['class'] = 'form-select'
+                elif isinstance(field.widget, forms.CheckboxInput):
+                    field.widget.attrs['class'] = 'form-check-input'
+                else:
+                    field.widget.attrs['class'] = 'form-control'
+# class ClientEditForm(forms.ModelForm):
+#     class Meta:
+#         model = Client
+#         fields = [
+#             'full_name',
+#             'phone',
+#             'email',
+#             'birth_date',
+           
+#             'photo',
+#             'notes',
+#             'card_id',
+#             'is_active',
+           
+#             'user'
+#         ]
+#         widgets = {
+#             'birth_date': forms.DateInput(attrs={'type': 'date'}),
+#             'notes': forms.Textarea(attrs={'rows': 4}),
+#         }
+#         labels = {
+#             'is_active': 'Активный статус',
+#             'discount_balance': 'Баланс скидки (руб)'
+#         }
+
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         # Фильтруем пользователей: только непривязанные + текущий (если есть)
+#         current_user = self.instance.user
+#         self.fields['user'].queryset = User.objects.filter(
+#             Q(client__isnull=True) | Q(pk=current_user.pk) if current_user else Q()
+#         )
+#         self.fields['user'].required = False
+        
+        
+        
 class OneTimeMembershipForm(forms.Form):
     client_full_name = forms.CharField(label='ФИО клиента', max_length=100)
     phone = forms.CharField(label='Телефон', max_length=20)

@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card border-0 shadow">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="bi bi-person-gear me-2"></i>
+                            Редактирование клиента: {{ client.full_name }}
+                        </h4>
+                        <span class="badge bg-{% if client.is_active %}success{% else %}danger{% endif %}">
+                            {% if client.is_active %}Активен{% else %}Неактивен{% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Основная информация -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.full_name.id_for_label }}" class="form-label">
+                                            <i class="bi bi-person-badge me-1"></i>
+                                            ФИО *
+                                        </label>
+                                        {{ form.full_name }}
+                                        <div class="invalid-feedback">
+                                            Пожалуйста, укажите ФИО клиента
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="{{ form.phone.id_for_label }}" class="form-label">
+                                            <i class="bi bi-telephone me-1"></i>
+                                            Телефон *
+                                        </label>
+                                        {{ form.phone }}
+                                        <div class="invalid-feedback">
+                                            Пожалуйста, укажите телефон
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="{{ form.email.id_for_label }}" class="form-label">
+                                            <i class="bi bi-envelope me-1"></i>
+                                            Email
+                                        </label>
+                                        {{ form.email }}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="{{ form.birth_date.id_for_label }}" class="form-label">
+                                            <i class="bi bi-calendar-event me-1"></i>
+                                            Дата рождения
+                                        </label>
+                                        {{ form.birth_date }}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="{{ form.card_id.id_for_label }}" class="form-label">
+                                            <i class="bi bi-credit-card me-1"></i>
+                                            ID карты доступа
+                                        </label>
+                                        {{ form.card_id }}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="{{ form.user.id_for_label }}" class="form-label">
+                                            <i class="bi bi-link-45deg me-1"></i>
+                                            Привязанный аккаунт
+                                        </label>
+                                        {{ form.user }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="text-center mb-3">
+                                    {% if client.photo %}
+                                        <img src="{{ client.photo.url }}" 
+                                             alt="Фото {{ client.full_name }}" 
+                                             class="img-thumbnail mb-2" 
+                                             style="max-height: 200px">
+                                    {% else %}
+                                        <div class="bg-light border rounded d-flex align-items-center justify-content-center" 
+                                             style="height: 200px">
+                                            <i class="bi bi-person-square fs-1 text-muted"></i>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <label for="{{ form.photo.id_for_label }}" class="btn btn-outline-secondary w-100">
+                                        <i class="bi bi-upload me-1"></i>
+                                        Загрузить фото
+                                    </label>
+                                    {{ form.photo }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Статус и примечания -->
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="form-check form-switch">
+                                    {{ form.is_active }}
+                                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                        Активный клиент
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-9">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                    <i class="bi bi-card-text me-1"></i>
+                                    Примечания
+                                </label>
+                                {{ form.notes }}
+                            </div>
+                        </div>
+                        
+                        <!-- Кнопки действий -->
+                        <div class="d-flex justify-content-between border-top pt-3">
+                            <a href="" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>
+                                Отмена
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i>
+                                Сохранить изменения
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-label {
+        font-weight: 500;
+    }
+    .card {
+        border-radius: 0.75rem;
+    }
+    .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+</style>
+
+<script>
+    // Включение валидации Bootstrap
+    (() => {
+        'use strict'
+        
+        const forms = document.querySelectorAll('.needs-validation')
+        
+        Array.from(forms).forEach(form => {
+            form.addEventListener('submit', event => {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                
+                form.classList.add('was-validated')
+            }, false)
+        })
+    })()
+</script>
+{% endblock %}

@@ -55,7 +55,7 @@
                     <td>{{ client.card_id }}</td>
                     <td>{{ client.get_gender_display }}</td>
                     <td>
-                        <a href="" class="btn btn-sm btn-primary" title="Редактировать">
+                        <a href="{% url 'edit_client' client.id %}" class="btn btn-sm btn-primary" title="Редактировать">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <a href="{% url 'client_detail' client.id %}" class="btn btn-sm btn-info" title="Подробнее">

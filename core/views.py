@@ -1128,7 +1128,26 @@ from django.contrib import messages
 from django.utils import timezone
 from .forms import OneTimeMembershipForm
 from .models import Client, Payment, CashRegister, CashOperation
+from django.shortcuts import get_object_or_404, render, redirect
+from .models import Client
+from .forms import ClientEditForm
 
+def edit_client(request, client_id):
+    client = get_object_or_404(Client, pk=client_id)
+    
+    if request.method == 'POST':
+        form = ClientEditForm(request.POST, request.FILES, instance=client)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Данные клиента успешно обновлены!')
+            return redirect('client_detail',client_id)  # Перенаправление после успеха
+    else:
+        form = ClientEditForm(instance=client)
+    
+    return render(request, 'core/edit_client.html', {
+        'form': form,
+        'client': client
+    })
 @login_required
 def sell_one_time_membership(request):
     if request.method == 'POST':
