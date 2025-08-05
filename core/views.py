@@ -880,7 +880,6 @@ def refund_membership(request, pk):
 #         membership.is_active = False
 #         membership.save()
 #         messages.success(request, f'Возврат {refund_amount} сом оформлен')
-        
 def export_reports(request):
     # Получаем параметры фильтрации из GET-запроса
     start_date = request.GET.get('start_date')
@@ -905,62 +904,153 @@ def export_reports(request):
     # Создаем Excel файл
     wb = Workbook()
     
-    # Лист с продажами абонементов
+    # --- Лист с продажами абонементов ---
     ws_sales = wb.active
     ws_sales.title = "Продажи абонементов"
-    ws_sales.append([
+    headers_sales = [
         'Дата', 'Клиент', 'Тип абонемента', 
         'Полная цена', 'Скидка', 'Оплачено', 
         'Долг', 'Ответственный'
-    ])
+    ]
+    ws_sales.append(headers_sales)
     
+    # Переменные для сумм продаж
+    total_full_price = 0
+    total_discount = 0
+    total_paid = 0
+    total_debt = 0
+    
+    # Обработка обычных абонементов
     for m in memberships:
+        # Преобразуем None в 0
+        original_price = m.original_price or 0
+        discount_amount = m.discount_amount or 0
+        paid_amount = m.paid_amount or 0
+        debt_amount = m.debt_amount or 0
+        
+        # Суммируем
+        total_full_price += original_price
+        total_discount += discount_amount
+        total_paid += paid_amount
+        total_debt += debt_amount
+        
         ws_sales.append([
             m.purchase_date.strftime('%d.%m.%Y'),
             m.client.full_name,
             m.membership_type.name,
-            m.original_price,
-            m.discount_amount,
-            m.paid_amount,
-            m.debt_amount,
-             m.created_by.username if m.created_by else 'Система'
-            # m.client.created_by.get_full_name() if m.client.created_by else ''
+            original_price,
+            discount_amount,
+            paid_amount,
+            debt_amount,
+            m.created_by.username if m.created_by else 'Система'
         ])
-    payment_aboniment = Payment.objects.filter(notes__icontains = "Одноразовый абонемент").filter(
+    
+    # Обработка одноразовых абонементов
+    payment_aboniment = Payment.objects.filter(notes__icontains="Одноразовый абонемент").filter(
         payment_date__date__gte=start_date,
         payment_date__date__lte=end_date
     )
 
     for m in payment_aboniment:
+        # Преобразуем None в 0
+        amount = m.amount or 0
+        discount_amount = m.discount_amount or 0
+        
+        # Суммируем (для одноразовых)
+        total_full_price += amount
+        total_discount += discount_amount
+        total_paid += amount
+        # Долг для одноразовых = 0
+        
         ws_sales.append([
             m.payment_date.strftime('%d.%m.%Y %H:%M'),
             m.notes,
             m.get_payment_method_display(),
-            m.amount,
-            m.discount_amount,
-            m.amount,
+            amount,
+            discount_amount,
+            amount,
             0,
-             m.created_by.username if m.created_by else 'Система'
-            # m.client.created_by.get_full_name() if m.client.created_by else ''
+            m.created_by.username if m.created_by else 'Система'
         ])
-    # Лист с платежами
-    ws_payments = wb.create_sheet("Платежи")
-    ws_payments.append([
-        'Дата', 'Клиент', 'Сумма', 
-        'Способ оплаты', 'Тип платежа', 'Абонемент',"Кто внес платеж"
+    
+    # Добавляем итоговую строку для продаж
+    ws_sales.append([
+        'ИТОГО:', '', '',
+        total_full_price,
+        total_discount,
+        total_paid,
+        total_debt,
+        ''
     ])
     
+    # --- Лист с платежами ---
+    ws_payments = wb.create_sheet("Платежи")
+    headers_payments = [
+        'Дата', 'Клиент', 'Сумма', 
+        'Способ оплаты', 'Тип платежа', 'Абонемент', "Кто внес платеж"
+    ]
+    ws_payments.append(headers_payments)
+    
+    # Переменные для сумм платежей
+    total_payments = 0
+    
+    # Обработка платежей
     for p in payments:
+        amount = p.amount or 0
+        total_payments += amount
+        
         ws_payments.append([
             p.payment_date.strftime('%d.%m.%Y %H:%M'),
             p.membership.client.full_name if p.membership else "долг",
-            
-            p.amount,
+            amount,
             p.get_payment_method_display(),
             'Погашение долга' if p.is_debt_payment else 'Оплата абонемента',
-            f"{p.membership.membership_type.name} (до {p.membership.end_date.strftime('%d.%m.%Y')})" if p.membership else "Долг" ,
-             p.created_by.username if p.created_by else 'Система'  # Новое поле p.created_by.get_full_name() if p.created_by else 'Система'  # Новое поле
+            f"{p.membership.membership_type.name} (до {p.membership.end_date.strftime('%d.%m.%Y')})" if p.membership else "Долг",
+            p.created_by.username if p.created_by else 'Система'
         ])
+    
+    # Добавляем итоговую строку для платежей
+    ws_payments.append([
+        'ИТОГО:', '', 
+        total_payments,
+        '', '', '', ''
+    ])
+    
+    # --- Стилизация итоговых строк ---
+    from openpyxl.styles import Font, PatternFill
+    
+    # Стиль для итоговых строк
+    bold_font = Font(bold=True)
+    fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    
+    # Стилизация листа продаж
+    last_row_sales = ws_sales.max_row
+    for col in range(1, 9):  # Колонки от A до H
+        cell = ws_sales.cell(row=last_row_sales, column=col)
+        cell.font = bold_font
+        if col >= 4:  # Только для числовых колонок
+            cell.fill = fill
+    
+    # Стилизация листа платежей
+    last_row_payments = ws_payments.max_row
+    for col in range(1, 8):  # Колонки от A до G
+        cell = ws_payments.cell(row=last_row_payments, column=col)
+        cell.font = bold_font
+        if col == 3:  # Колонка с суммой
+            cell.fill = fill
+    
+    # --- Настройка ширины столбцов ---
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
+        if col in ['D', 'E', 'F', 'G']:  # Числовые столбцы
+            ws_sales.column_dimensions[col].width = 15
+        else:
+            ws_sales.column_dimensions[col].width = 25
+    
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G']:
+        if col == 'C':  # Столбец с суммой
+            ws_payments.column_dimensions[col].width = 15
+        else:
+            ws_payments.column_dimensions[col].width = 25
     
     # Формируем HTTP-ответ
     response = HttpResponse(
@@ -968,7 +1058,95 @@ def export_reports(request):
     )
     response['Content-Disposition'] = f'attachment; filename=report_{start_date}_{end_date}.xlsx'
     wb.save(response)
-    return response        
+    return response
+# def export_reports(request):
+#     # Получаем параметры фильтрации из GET-запроса
+#     start_date = request.GET.get('start_date')
+#     end_date = request.GET.get('end_date')
+    
+#     # Конвертируем строки в даты
+#     from django.utils.dateparse import parse_date
+#     start_date = parse_date(start_date)
+#     end_date = parse_date(end_date)
+    
+#     # Фильтруем данные
+#     memberships = Membership.objects.filter(
+#         purchase_date__gte=start_date,
+#         purchase_date__lte=end_date
+#     ).select_related('client', 'membership_type')
+    
+#     payments = Payment.objects.filter(
+#         payment_date__date__gte=start_date,
+#         payment_date__date__lte=end_date
+#     ).select_related('membership')
+    
+#     # Создаем Excel файл
+#     wb = Workbook()
+    
+#     # Лист с продажами абонементов
+#     ws_sales = wb.active
+#     ws_sales.title = "Продажи абонементов"
+#     ws_sales.append([
+#         'Дата', 'Клиент', 'Тип абонемента', 
+#         'Полная цена', 'Скидка', 'Оплачено', 
+#         'Долг', 'Ответственный'
+#     ])
+    
+#     for m in memberships:
+#         ws_sales.append([
+#             m.purchase_date.strftime('%d.%m.%Y'),
+#             m.client.full_name,
+#             m.membership_type.name,
+#             m.original_price,
+#             m.discount_amount,
+#             m.paid_amount,
+#             m.debt_amount,
+#              m.created_by.username if m.created_by else 'Система'
+#             # m.client.created_by.get_full_name() if m.client.created_by else ''
+#         ])
+#     payment_aboniment = Payment.objects.filter(notes__icontains = "Одноразовый абонемент").filter(
+#         payment_date__date__gte=start_date,
+#         payment_date__date__lte=end_date
+#     )
+
+#     for m in payment_aboniment:
+#         ws_sales.append([
+#             m.payment_date.strftime('%d.%m.%Y %H:%M'),
+#             m.notes,
+#             m.get_payment_method_display(),
+#             m.amount,
+#             m.discount_amount,
+#             m.amount,
+#             0,
+#              m.created_by.username if m.created_by else 'Система'
+#             # m.client.created_by.get_full_name() if m.client.created_by else ''
+#         ])
+#     # Лист с платежами
+#     ws_payments = wb.create_sheet("Платежи")
+#     ws_payments.append([
+#         'Дата', 'Клиент', 'Сумма', 
+#         'Способ оплаты', 'Тип платежа', 'Абонемент',"Кто внес платеж"
+#     ])
+    
+#     for p in payments:
+#         ws_payments.append([
+#             p.payment_date.strftime('%d.%m.%Y %H:%M'),
+#             p.membership.client.full_name if p.membership else "долг",
+            
+#             p.amount,
+#             p.get_payment_method_display(),
+#             'Погашение долга' if p.is_debt_payment else 'Оплата абонемента',
+#             f"{p.membership.membership_type.name} (до {p.membership.end_date.strftime('%d.%m.%Y')})" if p.membership else "Долг" ,
+#              p.created_by.username if p.created_by else 'Система'  # Новое поле p.created_by.get_full_name() if p.created_by else 'Система'  # Новое поле
+#         ])
+    
+#     # Формируем HTTP-ответ
+#     response = HttpResponse(
+#         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+#     )
+#     response['Content-Disposition'] = f'attachment; filename=report_{start_date}_{end_date}.xlsx'
+#     wb.save(response)
+#     return response        
 # def export_reports(request):
 #     period = request.GET.get('period', 'day')
 #     date_from = request.GET.get('date_from')
@@ -1026,43 +1204,510 @@ def export_sales_report(request):
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     
-    # Фильтруем данные
+    # Фильтруем данные по продажам абонементов
     memberships = Membership.objects.filter(
         purchase_date__gte=date_from,
         purchase_date__lte=date_to
     ).select_related('client', 'membership_type')
     
+    # Фильтруем данные по платежам
+    payments = Payment.objects.filter(
+        payment_date__gte=date_from,
+        payment_date__lte=date_to
+    ).select_related('membership__client')
+    
     # Создаем Excel файл
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Отчет по продажам"
+    
+    # --- Лист с продажами абонементов ---
+    ws_sales = wb.active
+    ws_sales.title = "Продажи абонементов"
     
     # Заголовки
-    headers = [
+    headers_sales = [
         'Дата', 'Клиент', 'Тип абонемента', 
         'Полная стоимость', 'Скидка', 'Оплачено', 
         'Долг', 'Ответственный'
     ]
-    ws.append(headers)
+    ws_sales.append(headers_sales)
     
-    # Данные
+    # Инициализируем переменные для сумм
+    total_full_price = 0
+    total_discount = 0
+    total_paid_sales = 0
+    total_debt = 0
+    
+    # Данные по продажам
     for m in memberships:
-        ws.append([
+        full_price = m.membership_type.price or 0
+        discount = m.discount_amount or 0
+        paid = m.paid_amount or 0
+        debt = m.debt_amount or 0
+        
+        total_full_price += full_price
+        total_discount += discount
+        total_paid_sales += paid
+        total_debt += debt
+        
+        ws_sales.append([
             m.purchase_date.strftime('%d.%m.%Y'),
             m.client.full_name,
             m.membership_type.name,
-            m.membership_type.price,
-            m.discount_amount,
-            m.paid_amount,
-            m.debt_amount,
-            request.user.get_full_name()  # или другой способ получить ответственного
+            full_price,
+            discount,
+            paid,
+            debt,
+            request.user.get_full_name()
         ])
+    
+    # Добавляем итоги для продаж
+    ws_sales.append([])  # Пустая строка
+    ws_sales.append([
+        'ИТОГО ПРОДАЖИ:', '', '',
+        total_full_price,
+        total_discount,
+        total_paid_sales,
+        total_debt,
+        ''
+    ])
+    
+    # --- Лист с платежами ---
+    ws_payments = wb.create_sheet(title="Платежи")
+    
+    # Заголовки платежей
+    headers_payments = [
+        'Дата платежа', 'Клиент', 'Абонемент', 
+        'Сумма платежа', 'Ответственный'
+    ]
+    ws_payments.append(headers_payments)
+    
+    # Инициализируем переменные для сумм платежей
+    total_payments = 0
+    
+    # Данные по платежам
+    for p in payments:
+        amount = p.amount or 0
+        total_payments += amount
+        
+        ws_payments.append([
+            p.payment_date.strftime('%d.%m.%Y'),
+            p.membership.client.full_name,
+            p.membership.membership_type.name,
+            amount,
+            request.user.get_full_name()
+        ])
+    
+    # Добавляем итоги для платежей
+    ws_payments.append([])  # Пустая строка
+    ws_payments.append([
+        'ИТОГО ПЛАТЕЖИ:', '', '',
+        total_payments,
+        ''
+    ])
+    
+    # --- Лист с общими итогами ---
+    ws_summary = wb.create_sheet(title="Общие итоги")
+    
+    # Заголовок
+    ws_summary.append(["ОБЩИЕ ИТОГИ ЗА ПЕРИОД"])
+    ws_summary.append([f"С {date_from} по {date_to}"])
+    ws_summary.append([])  # Пустая строка
+    
+    # Данные итогов
+    ws_summary.append(["ПОКАЗАТЕЛЬ", "СУММА"])
+    ws_summary.append(["Общая стоимость абонементов", total_full_price])
+    ws_summary.append(["Общая скидка", total_discount])
+    ws_summary.append(["Оплачено при продажах", total_paid_sales])
+    ws_summary.append(["Получено платежей", total_payments])
+    ws_summary.append(["Общая сумма оплат", total_paid_sales + total_payments])
+    ws_summary.append(["Общий долг", total_debt])
+    
+    # Применяем стили к итогам
+    from openpyxl.styles import Font, Alignment
+    bold_font = Font(bold=True)
+    total_font = Font(bold=True, color="FF0000")
+    center_aligned = Alignment(horizontal='center')
+    
+    # Заголовок
+    ws_summary.merge_cells('A1:B1')
+    title_cell = ws_summary['A1']
+    title_cell.font = Font(bold=True, size=14)
+    title_cell.alignment = center_aligned
+    
+    # Период
+    ws_summary.merge_cells('A2:B2')
+    period_cell = ws_summary['A2']
+    period_cell.alignment = center_aligned
+    
+    # Итоговые суммы
+    for row in range(4, 10):
+        ws_summary[f'A{row}'].font = bold_font
+        ws_summary[f'B{row}'].font = bold_font
+    
+    # Общая сумма оплат
+    ws_summary['B8'].font = total_font
+    
+    # Настраиваем ширину столбцов
+    for col in ['A', 'B']:
+        ws_summary.column_dimensions[col].width = 30
     
     # Формируем ответ
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename=sales_report.xlsx'
     wb.save(response)
     return response
+# def export_sales_report(request):
+#     # Получаем параметры фильтрации
+#     date_from = request.GET.get('date_from')
+#     date_to = request.GET.get('date_to')
+    
+#     # Фильтруем данные
+#     memberships = Membership.objects.filter(
+#         purchase_date__gte=date_from,
+#         purchase_date__lte=date_to
+#     ).select_related('client', 'membership_type')
+    
+#     # Создаем Excel файл
+#     wb = Workbook()
+#     ws = wb.active
+#     ws.title = "Отчет по продажам"
+    
+#     # Заголовки
+#     headers = [
+#         'Дата', 'Клиент', 'Тип абонемента', 
+#         'Полная стоимость', 'Скидка', 'Оплачено', 
+#         'Долг', 'Ответственный'
+#     ]
+#     ws.append(headers)
+    
+#     # Инициализируем переменные для сумм
+#     total_full_price = 0
+#     total_discount = 0
+#     total_paid = 0
+#     total_debt = 0
+    
+#     # Собираем все данные сначала
+#     all_data = []
+#     for m in memberships:
+#         # Получаем числовые значения
+#         full_price = m.membership_type.price or 0
+#         discount = m.discount_amount or 0
+#         paid = m.paid_amount or 0
+#         debt = m.debt_amount or 0
+        
+#         # Суммируем значения
+#         total_full_price += full_price
+#         total_discount += discount
+#         total_paid += paid
+#         total_debt += debt
+        
+#         all_data.append([
+#             m.purchase_date.strftime('%d.%m.%Y'),
+#             m.client.full_name,
+#             m.membership_type.name,
+#             full_price,
+#             discount,
+#             paid,
+#             debt,
+#             request.user.get_full_name()
+#         ])
+    
+#     # Записываем данные с разбивкой на страницы
+#     ROWS_PER_PAGE = 20  # Количество строк на одной странице
+#     current_row_count = 0
+    
+#     for row in all_data:
+#         ws.append(row)
+#         current_row_count += 1
+        
+#         # Если достигли лимита строк на странице
+#         if current_row_count >= ROWS_PER_PAGE:
+#             # Добавляем пустую строку для разделения
+#             ws.append([])
+#             # Сбрасываем счетчик
+#             current_row_count = 0
+#             # Добавляем заголовки для новой страницы
+#             ws.append(headers)
+    
+#     # Добавляем общий итог
+#     ws.append([])  # Пустая строка для разделения
+#     ws.append([
+#         'ОБЩИЙ ИТОГО:', '', '',
+#         total_full_price,
+#         total_discount,
+#         total_paid,
+#         total_debt,
+#         ''
+#     ])
+    
+#     # Применяем стиль к итоговой строке
+#     from openpyxl.styles import Font
+#     bold_font = Font(bold=True)
+    
+#     last_row = ws.max_row
+#     for col in range(1, 9):  # Для всех столбцов от A до H
+#         cell = ws.cell(row=last_row, column=col)
+#         cell.font = bold_font
+    
+#     # Настраиваем печать
+#     ws.print_options.horizontalCentered = True
+#     ws.print_options.verticalCentered = True
+#     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+#     ws.page_setup.fitToHeight = False
+#     ws.page_setup.fitToWidth = True
+    
+#     # Формируем ответ
+#     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+#     response['Content-Disposition'] = 'attachment; filename=sales_report.xlsx'
+#     wb.save(response)
+#     return response
+# def export_sales_report(request):
+#     # Получаем параметры фильтрации
+#     date_from = request.GET.get('date_from')
+#     date_to = request.GET.get('date_to')
+    
+#     # Фильтруем данные
+#     memberships = Membership.objects.filter(
+#         purchase_date__gte=date_from,
+#         purchase_date__lte=date_to
+#     ).select_related('client', 'membership_type')
+    
+#     # Создаем Excel файл
+#     wb = Workbook()
+#     ws = wb.active
+#     ws.title = "Отчет по продажам"
+    
+#     # Заголовки
+#     headers = [
+#         'Дата', 'Клиент', 'Тип абонемента', 
+#         'Полная стоимость', 'Скидка', 'Оплачено', 
+#         'Долг', 'Ответственный'
+#     ]
+#     ws.append(headers)
+    
+#     # Настройки для разбивки на страницы
+#     ROWS_PER_PAGE = 20  # Количество строк на одной странице
+#     current_row_count = 0
+#     page_counter = 1
+    
+#     # Переменные для сумм
+#     total_full_price = 0
+#     total_discount = 0
+#     total_paid = 0
+#     total_debt = 0
+    
+#     # Переменные для промежуточных сумм
+#     page_full_price = 0
+#     page_discount = 0
+#     page_paid = 0
+#     page_debt = 0
+
+#     for m in memberships:
+#         # Получаем числовые значения
+#         full_price = m.membership_type.price or 0
+#         discount = m.discount_amount or 0
+#         paid = m.paid_amount or 0
+#         debt = m.debt_amount or 0
+        
+#         # Обновляем суммы
+#         total_full_price += full_price
+#         total_discount += discount
+#         total_paid += paid
+#         total_debt += debt
+        
+#         page_full_price += full_price
+#         page_discount += discount
+#         page_paid += paid
+#         page_debt += debt
+        
+#         # Добавляем строку с данными
+#         ws.append([
+#             m.purchase_date.strftime('%d.%m.%Y'),
+#             m.client.full_name,
+#             m.membership_type.name,
+#             full_price,
+#             discount,
+#             paid,
+#             debt,
+#             request.user.get_full_name()
+#         ])
+        
+#         current_row_count += 1
+        
+#         # Добавляем промежуточный итог для страницы
+#         if current_row_count >= ROWS_PER_PAGE:
+#             # Итог для текущей страницы
+#             ws.append([
+#                 f'ИТОГО Страница {page_counter}:', '', '',
+#                 page_full_price,
+#                 page_discount,
+#                 page_paid,
+#                 page_debt,
+#                 ''
+#             ])
+            
+#             # Сброс счетчиков для новой страницы
+#             current_row_count = 0
+#             page_counter += 1
+#             page_full_price = 0
+#             page_discount = 0
+#             page_paid = 0
+#             page_debt = 0
+            
+#             # Добавляем разделитель
+#             ws.append([])
+#             ws.append(headers)  # Повторяем заголовки для новой страницы
+
+#     # Добавляем промежуточный итог для последней страницы
+#     if current_row_count > 0:
+#         ws.append([
+#             f'ИТОГО Страница {page_counter}:', '', '',
+#             page_full_price,
+#             page_discount,
+#             page_paid,
+#             page_debt,
+#             ''
+#         ])
+    
+#     # Добавляем общий итог
+#     ws.append([])
+#     ws.append([
+#         'ОБЩИЙ ИТОГО:', '', '',
+#         total_full_price,
+#         total_discount,
+#         total_paid,
+#         total_debt,
+#         ''
+#     ])
+    
+#     # Настраиваем печать для многостраничных отчетов
+#     ws.print_options.horizontalCentered = True
+#     ws.print_options.verticalCentered = True
+#     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+#     ws.sheet_properties.pageSetUpPr.fitToPage = True
+    
+#     # Формируем ответ
+#     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+#     response['Content-Disposition'] = 'attachment; filename=sales_report.xlsx'
+#     wb.save(response)
+#     return response
+
+
+
+# def export_sales_report(request):
+#     # Получаем параметры фильтрации
+#     date_from = request.GET.get('date_from')
+#     date_to = request.GET.get('date_to')
+    
+#     # Фильтруем данные
+#     memberships = Membership.objects.filter(
+#         purchase_date__gte=date_from,
+#         purchase_date__lte=date_to
+#     ).select_related('client', 'membership_type')
+    
+#     # Создаем Excel файл
+#     wb = Workbook()
+#     ws = wb.active
+#     ws.title = "Отчет по продажам"
+    
+#     # Заголовки
+#     headers = [
+#         'Дата', 'Клиент', 'Тип абонемента', 
+#         'Полная стоимость', 'Скидка', 'Оплачено', 
+#         'Долг', 'Ответственный'
+#     ]
+#     ws.append(headers)
+    
+#     # Инициализируем переменные для сумм
+#     total_full_price = 0
+#     total_discount = 0
+#     total_paid = 0
+#     total_debt = 0
+    
+#     # Данные
+#     for m in memberships:
+#         # Получаем числовые значения (защита от None)
+#         full_price = m.membership_type.price or 0
+#         discount = m.discount_amount or 0
+#         paid = m.paid_amount or 0
+#         debt = m.debt_amount or 0
+        
+#         # Суммируем значения
+#         total_full_price += full_price
+#         total_discount += discount
+#         total_paid += paid
+#         total_debt += debt
+        
+#         ws.append([
+#             m.purchase_date.strftime('%d.%m.%Y'),
+#             m.client.full_name,
+#             m.membership_type.name,
+#             full_price,
+#             discount,
+#             paid,
+#             debt,
+#             request.user.get_full_name()
+#         ])
+    
+#     # Добавляем строку с итогами
+#     ws.append([
+#         'ИТОГО:', '', '',
+#         total_full_price,
+#         total_discount,
+#         total_paid,
+#         total_debt,
+#         ''
+#     ])
+    
+#     # Формируем ответ
+#     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+#     response['Content-Disposition'] = 'attachment; filename=sales_report.xlsx'
+#     wb.save(response)
+#     return response
+
+
+# def export_sales_report(request):
+#     # Получаем параметры фильтрации
+#     date_from = request.GET.get('date_from')
+#     date_to = request.GET.get('date_to')
+    
+#     # Фильтруем данные
+#     memberships = Membership.objects.filter(
+#         purchase_date__gte=date_from,
+#         purchase_date__lte=date_to
+#     ).select_related('client', 'membership_type')
+    
+#     # Создаем Excel файл
+#     wb = Workbook()
+#     ws = wb.active
+#     ws.title = "Отчет по продажам"
+    
+#     # Заголовки
+#     headers = [
+#         'Дата', 'Клиент', 'Тип абонемента', 
+#         'Полная стоимость', 'Скидка', 'Оплачено', 
+#         'Долг', 'Ответственный'
+#     ]
+#     ws.append(headers)
+    
+#     # Данные
+#     for m in memberships:
+#         ws.append([
+#             m.purchase_date.strftime('%d.%m.%Y'),
+#             m.client.full_name,
+#             m.membership_type.name,
+#             m.membership_type.price,
+#             m.discount_amount,
+#             m.paid_amount,
+#             m.debt_amount,
+#             request.user.get_full_name()  # или другой способ получить ответственного
+#         ])
+    
+#     # Формируем ответ
+#     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+#     response['Content-Disposition'] = 'attachment; filename=sales_report.xlsx'
+#     wb.save(response)
+#     return response
 # def export_reports(request):
 #     period = request.GET.get('period', 'day')
 #     date_from = request.GET.get('date_from')
