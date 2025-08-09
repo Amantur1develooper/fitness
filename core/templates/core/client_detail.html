@@ -222,6 +222,53 @@
                 </div>
             </div>
             
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <i class="bi bi-clock-history"></i> История Посещений
+                </div>
+                <div class="card-body">
+                    {% if total_visits %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Дата</th>
+                                    
+                                    <th>абонемент</th>
+                                  
+                                   
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for membership in total_visits2 %}
+                                <tr>
+                                    <td>{{ membership.visit_time }}</td>
+                                    <td>{{ membership.membership }}</td>
+                                    {% comment %} <td>{{ membership.purchase_date|date:"d.m.Y" }}</td> {% endcomment %}
+                                    {% comment %} <td>
+                                        {{ membership.start_date|date:"d.m.Y" }}<br>
+                                        {{ membership.end_date|date:"d.m.Y" }}
+                                    </td>
+                                    <td>
+                                        {% if membership.is_active %}
+                                            <span class="badge bg-success">Активен</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Завершен</span>
+                                        {% endif %}
+                                    </td> {% endcomment %}
+                                    {% comment %} <td>
+                                        {{ membership.visits.count }}/{{ membership.membership_type.visits_number }}
+                                    </td> {% endcomment %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                        <p class="text-muted">Нет истории Посещений</p>
+                    {% endif %}
+                </div>
+            </div>
             <!-- История абонементов -->
             <div class="card">
                 <div class="card-header bg-secondary text-white">
