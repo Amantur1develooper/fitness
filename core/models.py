@@ -61,6 +61,7 @@ class Membership(models.Model):
     debt_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     freeze_start = models.DateField(null=True, blank=True)
     freeze_days = models.PositiveIntegerField(default=0)
+    freeze_end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания заморозки")
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -92,6 +93,7 @@ class Membership(models.Model):
             self.end_date += timedelta(days=self.freeze_days)
             self.freeze_days = 0
             self.freeze_start = None
+            self.freeze_end_date = None
         super().save(*args, **kwargs)
     # def save(self, *args, **kwargs):
     #     if not self.pk:  # При создании

@@ -147,6 +147,10 @@
                             {% if membership.is_frozen %}
                             <div class="alert alert-info py-2 mb-3">
                                 <i class="bi bi-snow"></i> Заморожен с {{ membership.freeze_start|date:"d.m.Y" }}
+                                {% if membership.freeze_end_date %}
+                                    до <strong>{{ membership.freeze_end_date|date:"d.m.Y" }}</strong>
+                                    ({{ membership.freeze_days }} дн.) — срок продлится автоматически
+                                {% endif %}
                             </div>
                             {% endif %}
                             
@@ -188,13 +192,16 @@
                                         </button>
                                     </form>
                                 {% else %}
-                                    <form method="post" action="{% url 'freeze_membership' membership.id %}" class="flex-grow-1">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-secondary btn-sm w-100"
-                                                {% if membership.end_date < current_date %}disabled{% endif %}>
+                                    <div class="flex-grow-1">
+                                        <button type="button" class="btn btn-secondary btn-sm w-100"
+                                                {% if membership.end_date < current_date %}disabled{% endif %}
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#freezeModal"
+                                                data-membership-id="{{ membership.id }}"
+                                                data-membership-url="{% url 'freeze_membership' membership.id %}">
                                             <i class="bi bi-snow"></i> Заморозить
                                         </button>
-                                    </form>
+                                    </div>
                                 {% endif %}
                                 
                                 <form method="post" action="{% url 'refund_membership' membership.id %}" class="flex-grow-1">
@@ -364,9 +371,47 @@
     </div>
 </div>
 
+<!-- Модальное окно заморозки -->
+<div class="modal fade" id="freezeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-snow"></i> Заморозить абонемент</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="freezeForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="form-label">Срок заморозки (дней)</label>
+                    <input type="number" name="freeze_duration" id="freeze_duration"
+                           class="form-control" value="7" min="1" max="365" required>
+                    <small class="text-muted">Абонемент будет продлён на это количество дней после заморозки.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-snow"></i> Заморозить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Установка URL заморозки при открытии модального окна
+    const freezeModal = document.getElementById('freezeModal');
+    if (freezeModal) {
+        freezeModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const url = button.getAttribute('data-membership-url');
+            document.getElementById('freezeForm').setAttribute('action', url);
+            document.getElementById('freeze_duration').value = 7;
+        });
+    }
+
     // Обновление информации о цене при выборе типа абонемента
     const membershipTypeSelect = document.getElementById('id_membership_type');
     const discountInput = document.getElementById('id_discount_amount');

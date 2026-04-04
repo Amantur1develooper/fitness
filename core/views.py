@@ -229,6 +229,12 @@ def client_detail(request, pk):
         return redirect('client_detail', pk=client.id)
     
     
+    # Авто-разморозка: если срок заморозки истёк — размораживаем
+    today = timezone.now().date()
+    for m in Membership.objects.filter(client=client, is_frozen=True, freeze_end_date__lte=today):
+        m.is_frozen = False
+        m.save()
+
     # Активные абонементы (включая замороженные, у которых мог истечь срок)
     active_memberships = Membership.objects.filter(
         client=client,
@@ -472,16 +478,27 @@ from datetime import timedelta
 def freeze_membership(request, pk):
     membership = get_object_or_404(Membership, pk=pk)
     if request.method == 'POST':
-        # Нельзя заморозить уже завершенный абонемент
         if membership.end_date < timezone.now().date():
             messages.error(request, 'Нельзя заморозить просроченный абонемент')
             return redirect('client_detail', pk=membership.client.id)
-            
+
+        try:
+            freeze_duration = int(request.POST.get('freeze_duration', 7))
+        except (ValueError, TypeError):
+            freeze_duration = 7
+
+        if freeze_duration <= 0:
+            messages.error(request, 'Срок заморозки должен быть больше 0 дней')
+            return redirect('client_detail', pk=membership.client.id)
+
+        today = timezone.now().date()
         membership.is_frozen = True
-        membership.freeze_start = timezone.now().date()
+        membership.freeze_start = today
+        membership.freeze_days = freeze_duration
+        membership.freeze_end_date = today + timedelta(days=freeze_duration)
         membership.save()
-        
-        messages.success(request, 'Абонемент заморожен. Срок действия будет продлен после разморозки.')
+
+        messages.success(request, f'Абонемент заморожен на {freeze_duration} дней. Срок будет продлён автоматически {membership.freeze_end_date.strftime("%d.%m.%Y")}.')
         return redirect('client_detail', pk=membership.client.id)
 
 
@@ -492,14 +509,12 @@ def unfreeze_membership(request, pk):
         if not membership.is_frozen:
             messages.warning(request, 'Абонемент не заморожен')
             return redirect('client_detail', pk=membership.client.id)
-            
-        # Рассчитываем дни заморозки
-        freeze_days = (timezone.now().date() - membership.freeze_start).days
-        membership.freeze_days = freeze_days
+
+        freeze_days = membership.freeze_days
         membership.is_frozen = False
-        membership.save()  # В save() автоматически продлится срок
-        
-        messages.success(request, f'Абонемент разморожен. Срок продлен на {freeze_days} дней.')
+        membership.save()  # В save() автоматически продлится срок на freeze_days
+
+        messages.success(request, f'Абонемент разморожен. Срок продлён на {freeze_days} дней.')
         return redirect('client_detail', pk=membership.client.id)
 
 @login_required
