@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from django.db.models import Q
 from django.shortcuts import render
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
@@ -228,11 +229,12 @@ def client_detail(request, pk):
         return redirect('client_detail', pk=client.id)
     
     
-    # Активные абонементы
+    # Активные абонементы (включая замороженные, у которых мог истечь срок)
     active_memberships = Membership.objects.filter(
         client=client,
         is_active=True,
-        end_date__gte=timezone.now().date()
+    ).filter(
+        Q(end_date__gte=timezone.now().date()) | Q(is_frozen=True)
     ).order_by('-start_date')
     
     # Все абонементы (для истории)
@@ -355,12 +357,13 @@ def client_detail(request, pk):
     context = {
         'client': client,
         'total_debt': total_debt,
-         'active_membership': active_membership,
+        'active_membership': active_membership,
         'active_memberships': active_memberships,
         'all_memberships': all_memberships,
         'total_visits': total_visits,
-        'total_visits2':total_visits2,
-         'form': form,
+        'total_visits2': total_visits2,
+        'form': form,
+        'current_date': timezone.now().date(),
     }
     return render(request, 'core/client_detail.html', context)
 
