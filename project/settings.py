@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-4kjpdeec9i-er9y2122by@!x0@(_x8*5yvzw^x#ewtca404_ne
 DEBUG = True
 
 ALLOWED_HOSTS = ['5.129.227.190',"fitness005.uk", "www.fitness005.uk"]
-
+CSRF_TRUSTED_ORIGINS = ["http://fitness005.uk", "https://fitness005.uk", "https://www.fitness005.uk"]
 
 # Application definition
 
