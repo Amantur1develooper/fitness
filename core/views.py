@@ -291,8 +291,8 @@ def client_detail(request, pk):
             membership.original_price = membership.membership_type.price
         
         # Получаем данные из формы
-            discount = form.cleaned_data.get('discount_amount', 0)
-            paid = form.cleaned_data.get('paid_amount', 0)
+            discount = form.cleaned_data.get('discount_amount') or Decimal('0')
+            paid = form.cleaned_data.get('paid_amount') or Decimal('0')
         
         # Рассчитываем сколько должно быть оплачено с учетом скидки
             required_payment = membership.original_price - discount

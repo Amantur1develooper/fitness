@@ -83,6 +83,11 @@ class MembershipForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['paid_amount'].widget.attrs.update({'class': 'form-control'})
         self.fields['discount_amount'].widget.attrs.update({'class': 'form-control'})
+
+    def clean_discount_amount(self):
+        value = self.cleaned_data.get('discount_amount')
+        from decimal import Decimal
+        return value if value is not None else Decimal('0')
 # class MembershipForm(forms.ModelForm):
 #     discount_amount = forms.DecimalField(
 #         max_digits=10, 
