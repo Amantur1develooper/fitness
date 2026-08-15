@@ -992,14 +992,15 @@ def sell_one_time_membership(request):
 #      
 #     # Создаем нового
             # Создаем или находим клиента
-            client, created = Client.objects.get_or_create(
-                phone=form.cleaned_data['phone'],
-                defaults={
-                    'full_name': form.cleaned_data['client_full_name'],
-                    'created_by': request.user,
-                    'notes': f"Купил одноразовый абонимент в {timezone.localtime(timezone.now())}"
-                }
-            )
+            client = Client.objects.filter(phone=form.cleaned_data['phone']).order_by('-id').first()
+            created = client is None
+            if created:
+                client = Client.objects.create(
+                    phone=form.cleaned_data['phone'],
+                    full_name=form.cleaned_data['client_full_name'],
+                    created_by=request.user,
+                    notes=f"Купил одноразовый абонимент в {timezone.localtime(timezone.now())}"
+                )
             
             if not created:
                 client.full_name = form.cleaned_data['client_full_name']
