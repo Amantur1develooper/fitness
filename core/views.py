@@ -667,7 +667,7 @@ def export_reports(request):
         # Долг для одноразовых = 0
         
         ws_sales.append([
-            m.payment_date.strftime('%d.%m.%Y %H:%M'),
+            timezone.localtime(m.payment_date).strftime('%d.%m.%Y %H:%M'),
             m.notes,
             m.get_payment_method_display(),
             amount,
@@ -704,7 +704,7 @@ def export_reports(request):
         total_payments += amount
         
         ws_payments.append([
-            p.payment_date.strftime('%d.%m.%Y %H:%M'),
+            timezone.localtime(p.payment_date).strftime('%d.%m.%Y %H:%M'),
             p.membership.client.full_name if p.membership else "долг",
             amount,
             p.get_payment_method_display(),
@@ -859,7 +859,7 @@ def export_sales_report(request):
         total_payments += amount
         
         ws_payments.append([
-            p.payment_date.strftime('%d.%m.%Y'),
+            timezone.localtime(p.payment_date).strftime('%d.%m.%Y'),
             p.membership.client.full_name,
             p.membership.membership_type.name,
             amount,
@@ -996,9 +996,9 @@ def sell_one_time_membership(request):
                 phone=form.cleaned_data['phone'],
                 defaults={
                     'full_name': form.cleaned_data['client_full_name'],
-                    'created_by': request.user
-                },
-                notes = f"Купил одноразовый абонимент в {datetime.now()}"
+                    'created_by': request.user,
+                    'notes': f"Купил одноразовый абонимент в {timezone.localtime(timezone.now())}"
+                }
             )
             
             if not created:
