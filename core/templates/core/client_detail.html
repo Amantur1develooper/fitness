@@ -204,12 +204,15 @@
                                     </div>
                                 {% endif %}
                                 
-                                <form method="post" action="{% url 'refund_membership' membership.id %}" class="flex-grow-1">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-danger btn-sm w-100">
+                                <div class="flex-grow-1">
+                                    <button type="button" class="btn btn-danger btn-sm w-100"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#refundModal"
+                                            data-membership-name="{{ membership.membership_type }}"
+                                            data-membership-url="{% url 'refund_membership' membership.id %}">
                                         <i class="bi bi-arrow-counterclockwise"></i> Возврат
                                     </button>
-                                </form>
+                                </div>
                                 
                                 <form method="post" class="flex-grow-1">
                                     {% csrf_token %}
@@ -398,6 +401,32 @@
     </div>
 </div>
 
+<!-- Модальное окно подтверждения возврата -->
+<div class="modal fade" id="refundModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-danger"></i> Отмена абонемента</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="refundForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    Вы точно уверены, что хотите отменить абонемент
+                    «<span id="refundMembershipName"></span>» и оформить возврат?
+                    <small class="d-block text-muted mt-2">Это действие нельзя отменить.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Нет</button>
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="bi bi-arrow-counterclockwise"></i> Да, отменить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -409,6 +438,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const url = button.getAttribute('data-membership-url');
             document.getElementById('freezeForm').setAttribute('action', url);
             document.getElementById('freeze_duration').value = 7;
+        });
+    }
+
+    // Установка URL возврата при открытии окна подтверждения
+    const refundModal = document.getElementById('refundModal');
+    if (refundModal) {
+        refundModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            document.getElementById('refundForm').setAttribute('action', button.getAttribute('data-membership-url'));
+            document.getElementById('refundMembershipName').textContent = button.getAttribute('data-membership-name');
         });
     }
 

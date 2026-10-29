@@ -584,6 +584,21 @@ def refund_membership(request, pk):
         
         return redirect('client_detail', pk=membership.client.id)
 
+ONE_TIME_NOTE = "Одноразовый абонемент"
+
+
+def parse_one_time_note(notes):
+    """Разбирает примечание одноразового платежа на (тип, имя клиента).
+
+    Формат: "Одноразовый абонемент (до 14:00)имя:Иван Иванов <примечание>"
+    """
+    notes = notes or ''
+    if 'имя:' in notes:
+        kind, name = notes.split('имя:', 1)
+        return kind.strip() or ONE_TIME_NOTE, name.strip() or 'Без имени'
+    return ONE_TIME_NOTE, notes.replace(ONE_TIME_NOTE, '').strip() or 'Без имени'
+
+
 def export_reports(request):
     # Получаем параметры фильтрации из GET-запроса
     start_date = request.GET.get('start_date')
@@ -603,7 +618,7 @@ def export_reports(request):
     payments = Payment.objects.filter(
         payment_date__date__gte=start_date,
         payment_date__date__lte=end_date
-    ).select_related('membership')
+    ).select_related('membership__client', 'membership__membership_type', 'client', 'created_by')
     
     # Создаем Excel файл
     wb = Workbook()
@@ -650,10 +665,12 @@ def export_reports(request):
         ])
     
     # Обработка одноразовых абонементов
-    payment_aboniment = Payment.objects.filter(notes__icontains="Одноразовый абонемент").filter(
+    payment_aboniment = Payment.objects.filter(
+        Q(notes__icontains=ONE_TIME_NOTE) | Q(client__isnull=False, membership__isnull=True)
+    ).filter(
         payment_date__date__gte=start_date,
         payment_date__date__lte=end_date
-    )
+    ).select_related('client', 'created_by')
 
     for m in payment_aboniment:
         # Преобразуем None в 0
@@ -666,10 +683,13 @@ def export_reports(request):
         total_paid += amount
         # Долг для одноразовых = 0
         
+        kind, client_name = parse_one_time_note(m.notes)
+        if m.client:
+            client_name = m.client.full_name
         ws_sales.append([
             timezone.localtime(m.payment_date).strftime('%d.%m.%Y %H:%M'),
-            m.notes,
-            m.get_payment_method_display(),
+            client_name,
+            f"{kind}, {m.get_payment_method_display()}",
             amount,
             discount_amount,
             amount,
@@ -703,13 +723,27 @@ def export_reports(request):
         amount = p.amount or 0
         total_payments += amount
         
+        if p.membership:
+            client_name = p.membership.client.full_name
+            payment_type = 'Погашение долга' if p.is_debt_payment else 'Оплата абонемента'
+            membership_info = f"{p.membership.membership_type.name} (до {p.membership.end_date.strftime('%d.%m.%Y')})"
+        elif p.client or (p.notes and ONE_TIME_NOTE in p.notes):
+            membership_info, client_name = parse_one_time_note(p.notes)
+            if p.client:
+                client_name = p.client.full_name
+            payment_type = 'Одноразовый абонемент'
+        else:
+            client_name = p.notes or "долг"
+            payment_type = 'Погашение долга' if p.is_debt_payment else 'Оплата'
+            membership_info = "Долг" if p.is_debt_payment else "—"
+        
         ws_payments.append([
             timezone.localtime(p.payment_date).strftime('%d.%m.%Y %H:%M'),
-            p.membership.client.full_name if p.membership else "долг",
+            client_name,
             amount,
             p.get_payment_method_display(),
-            'Погашение долга' if p.is_debt_payment else 'Оплата абонемента',
-            f"{p.membership.membership_type.name} (до {p.membership.end_date.strftime('%d.%m.%Y')})" if p.membership else "Долг",
+            payment_type,
+            membership_info,
             p.created_by.username if p.created_by else 'Система'
         ])
     
@@ -1008,9 +1042,10 @@ def sell_one_time_membership(request):
             
             # Создаем платеж
             payment = Payment.objects.create(
+                client=client,
                 amount=price,
                 payment_method=form.cleaned_data['payment_method'],
-                notes=f"Одноразовый абонемент ({'до 14:00' if price == 200 else 'после 14:00'})имя:{form.cleaned_data['client_full_name']} {form.cleaned_data['notes']}",
+                notes=f"{ONE_TIME_NOTE} ({'до 14:00' if price == 200 else 'после 14:00'})имя:{form.cleaned_data['client_full_name']} {form.cleaned_data['notes']}"[:100],
                 created_by=request.user
             )
             

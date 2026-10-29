@@ -133,6 +133,9 @@ class Payment(models.Model):
     ]
     
     membership = models.ForeignKey(Membership,null=True, blank=True, on_delete=models.PROTECT)
+    # Клиент для платежей без абонемента (одноразовые абонементы)
+    client = models.ForeignKey(Client, null=True, blank=True, on_delete=models.SET_NULL,
+                               verbose_name="Клиент")
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Сумма")
     payment_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата оплаты")
     payment_method = models.CharField(max_length=10, choices=PAYMENT_METHODS, 
