@@ -510,11 +510,24 @@ def unfreeze_membership(request, pk):
             messages.warning(request, 'Абонемент не заморожен')
             return redirect('client_detail', pk=membership.client.id)
 
-        freeze_days = membership.freeze_days
+        # При досрочной разморозке продлеваем только на фактические дни заморозки,
+        # оставшиеся дни аннулируются
+        planned_days = membership.freeze_days
+        if membership.freeze_start:
+            actual_days = (timezone.now().date() - membership.freeze_start).days
+            freeze_days = max(0, min(actual_days, planned_days))
+        else:
+            freeze_days = planned_days
+
+        membership.freeze_days = freeze_days
         membership.is_frozen = False
         membership.save()  # В save() автоматически продлится срок на freeze_days
 
-        messages.success(request, f'Абонемент разморожен. Срок продлён на {freeze_days} дней.')
+        if freeze_days < planned_days:
+            messages.success(request, f'Абонемент разморожен досрочно. Срок продлён на {freeze_days} дн. '
+                                      f'(фактически заморожен), оставшиеся {planned_days - freeze_days} дн. аннулированы.')
+        else:
+            messages.success(request, f'Абонемент разморожен. Срок продлён на {freeze_days} дней.')
         return redirect('client_detail', pk=membership.client.id)
 
 @login_required
@@ -585,16 +598,19 @@ def refund_membership(request, pk):
         return redirect('client_detail', pk=membership.client.id)
 
 ONE_TIME_NOTE = "Одноразовый абонемент"
+ONE_TIME_NOTE_SEP = " | "  # отделяет имя от примечания продавца
 
 
 def parse_one_time_note(notes):
     """Разбирает примечание одноразового платежа на (тип, имя клиента).
 
-    Формат: "Одноразовый абонемент (до 14:00)имя:Иван Иванов <примечание>"
+    Формат: "Одноразовый абонемент (до 14:00)имя:Иван Иванов | <примечание>"
+    (в старых записях примечание шло через пробел, без " | ")
     """
     notes = notes or ''
     if 'имя:' in notes:
         kind, name = notes.split('имя:', 1)
+        name = name.split(ONE_TIME_NOTE_SEP, 1)[0]
         return kind.strip() or ONE_TIME_NOTE, name.strip() or 'Без имени'
     return ONE_TIME_NOTE, notes.replace(ONE_TIME_NOTE, '').strip() or 'Без имени'
 
@@ -683,9 +699,8 @@ def export_reports(request):
         total_paid += amount
         # Долг для одноразовых = 0
         
+        # Имя берём из записи о продаже: карточку клиента могли переименовать позже
         kind, client_name = parse_one_time_note(m.notes)
-        if m.client:
-            client_name = m.client.full_name
         ws_sales.append([
             timezone.localtime(m.payment_date).strftime('%d.%m.%Y %H:%M'),
             client_name,
@@ -729,8 +744,6 @@ def export_reports(request):
             membership_info = f"{p.membership.membership_type.name} (до {p.membership.end_date.strftime('%d.%m.%Y')})"
         elif p.client or (p.notes and ONE_TIME_NOTE in p.notes):
             membership_info, client_name = parse_one_time_note(p.notes)
-            if p.client:
-                client_name = p.client.full_name
             payment_type = 'Одноразовый абонемент'
         else:
             client_name = p.notes or "долг"
@@ -1025,27 +1038,33 @@ def sell_one_time_membership(request):
             price = form.cleaned_data['price']
 #      
 #     # Создаем нового
-            # Создаем или находим клиента
-            client = Client.objects.filter(phone=form.cleaned_data['phone']).order_by('-id').first()
-            created = client is None
-            if created:
+            # Ищем клиента по телефону И имени. Имя существующего клиента не меняем:
+            # один номер могут дать разные люди, и тогда чужая карточка переименовывалась
+            full_name = ' '.join(form.cleaned_data['client_full_name'].split())
+            phone = form.cleaned_data['phone'].strip()
+            # Сравниваем в Python: SQLite не умеет без учёта регистра для кириллицы
+            client = next(
+                (c for c in Client.objects.filter(phone=phone).order_by('-id')
+                 if ' '.join(c.full_name.split()).casefold() == full_name.casefold()),
+                None,
+            )
+            if client is None:
                 client = Client.objects.create(
-                    phone=form.cleaned_data['phone'],
-                    full_name=form.cleaned_data['client_full_name'],
+                    phone=phone,
+                    full_name=full_name,
                     created_by=request.user,
                     notes=f"Купил одноразовый абонимент в {timezone.localtime(timezone.now())}"
                 )
             
-            if not created:
-                client.full_name = form.cleaned_data['client_full_name']
-                client.save()
+            extra_notes = ' '.join(form.cleaned_data['notes'].split())
             
             # Создаем платеж
             payment = Payment.objects.create(
                 client=client,
                 amount=price,
                 payment_method=form.cleaned_data['payment_method'],
-                notes=f"{ONE_TIME_NOTE} ({'до 14:00' if price == 200 else 'после 14:00'})имя:{form.cleaned_data['client_full_name']} {form.cleaned_data['notes']}"[:100],
+                notes=(f"{ONE_TIME_NOTE} ({'до 14:00' if price == 200 else 'после 14:00'})имя:{full_name}"
+                       + (f"{ONE_TIME_NOTE_SEP}{extra_notes}" if extra_notes else ''))[:100],
                 created_by=request.user
             )
             
